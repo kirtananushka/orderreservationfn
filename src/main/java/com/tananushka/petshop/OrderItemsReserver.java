@@ -5,15 +5,13 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobClientBuilder;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.azure.functions.ExecutionContext;
-import com.microsoft.azure.functions.HttpMethod;
-import com.microsoft.azure.functions.HttpRequestMessage;
-import com.microsoft.azure.functions.HttpResponseMessage;
-import com.microsoft.azure.functions.HttpStatus;
-import com.microsoft.azure.functions.annotation.AuthorizationLevel;
 import com.microsoft.azure.functions.annotation.FunctionName;
-import com.microsoft.azure.functions.annotation.HttpTrigger;
-import com.tananushka.petshop.model.OrderReservationRequest;
+import com.microsoft.azure.functions.annotation.ServiceBusQueueTrigger;
+import com.tananushka.petshop.exception.OrderItemsReserverException;
+import com.tananushka.petshop.exception.StorageUploadingException;
+import com.tananushka.petshop.model.Order;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -22,29 +20,28 @@ import static java.lang.String.format;
 public class OrderItemsReserver {
 
   @FunctionName("OrderItemsReserver")
-  public HttpResponseMessage run(
-    @HttpTrigger(name = "req", methods = {HttpMethod.GET, HttpMethod.POST}, authLevel = AuthorizationLevel.ANONYMOUS) HttpRequestMessage<Optional<OrderReservationRequest>> request,
-    final ExecutionContext context) {
-
-    context.getLogger().info("OrderItemsReserver: Starting...");
+  public void run(
+    @ServiceBusQueueTrigger(
+      name = "msg",
+      queueName = "petstoreorderqueue",
+      connection = "SERVICE_BUS_CONNECTION_STRING")
+    String message, final ExecutionContext context) {
 
     try {
-      OrderReservationRequest reservationRequest = request.getBody().filter(r -> !r.getSessionId().isBlank()).orElseThrow(() -> new IllegalArgumentException("Empty body"));
-
-      context.getLogger().info(format("OrderItemsReserver: new request=%s", reservationRequest));
-
-      uploadToStorage(context, reservationRequest);
-
-      return request.createResponseBuilder(HttpStatus.OK)
-        .body("Order successfully placed in storage").build();
+      context.getLogger().info("OrderItemsReserver: Starting...");
+      Order order = new ObjectMapper().readValue(message, Order.class);
+      String id = Optional.ofNullable(order.getId())
+        .orElseThrow(() -> new IllegalArgumentException("OrderItemsReserver: order id is null"));
+      uploadToStorage(context, message, id);
+      context.getLogger().info("OrderItemsReserver: Success.");
+    } catch (StorageUploadingException sue) {
+      throw new OrderItemsReserverException(sue);
     } catch (Exception e) {
-      context.getLogger().severe("Error while replacing order: " + e);
-      return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
-        .body(e.getMessage()).build();
+      throw new OrderItemsReserverException("Error while replacing order: ", e);
     }
   }
 
-  private void uploadToStorage(ExecutionContext context, OrderReservationRequest request) {
+  private void uploadToStorage(ExecutionContext context, String orderJSON, String id) {
     context.getLogger().info("OrderItemsReserver: Retrieving connection string and container name...");
     String connectionString = Optional.ofNullable(
         System.getenv("AZURE_STORAGE_CONNECTION_STRING"))
@@ -53,8 +50,7 @@ public class OrderItemsReserver {
         System.getenv("AZURE_STORAGE_CONTAINER_NAME"))
       .orElseThrow(() -> new NoSuchElementException("AZURE_STORAGE_CONTAINER_NAME is not set"));
 
-    String fileName = format("%s.json", request.getSessionId());
-    String orderJSON = request.getOrderJSON();
+    String fileName = format("%s.json", id);
 
     try {
       context.getLogger().info("OrderItemsReserver: Building container client...");
@@ -84,7 +80,7 @@ public class OrderItemsReserver {
       context.getLogger().info(format("OrderItemsReserver: Uploading %s to blob storage...", fileName));
       blobClient.upload(binaryData.toStream(), orderJSON.length(), true);
     } catch (Exception e) {
-      throw new RuntimeException("Error while uploading data to blob storage", e);
+      throw new StorageUploadingException("Error while uploading data to blob storage", e);
     }
   }
 }

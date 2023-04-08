@@ -10,13 +10,15 @@
     <name>Order Items Reserver Function</name>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>11</java.version>
-        <azure.functions.maven.plugin.version>1.23.0</azure.functions.maven.plugin.version>
-        <azure.functions.java.library.version>3.0.0</azure.functions.java.library.version>
-        <azure.core.version>1.37.0</azure.core.version>
-        <azure.storage.blob>12.20.3</azure.storage.blob>
-        <functionAppName>orderreservationfn</functionAppName>
+      <functionAppName>orderreservationfn</functionAppName>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <java.version>11</java.version>
+      <azure.functions.maven.plugin.version>1.23.0</azure.functions.maven.plugin.version>
+      <azure.functions.java.library.version>3.0.0</azure.functions.java.library.version>
+      <azure.core.version>1.37.0</azure.core.version>
+      <azure.storage.blob.version>12.20.3</azure.storage.blob.version>
+      <azure.messaging.servicebus.version>7.13.3</azure.messaging.servicebus.version>
+      <jackson.databind.version>2.14.2</jackson.databind.version>
     </properties>
 
     <dependencies>
@@ -33,7 +35,17 @@
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-storage-blob</artifactId>
-            <version>12.20.3</version>
+            <version>${azure.storage.blob.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-messaging-servicebus</artifactId>
+            <version>${azure.messaging.servicebus.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+          <version>${jackson.databind.version}</version>
         </dependency>
     </dependencies>
 
@@ -56,17 +68,17 @@
                 <configuration>
                     <appName>${functionAppName}</appName>
                     <resourceGroup>petstore-eastus-function-rg</resourceGroup>
-                    <appServicePlanName>petstore-eastus-function-app-service-plan</appServicePlanName>
+                    <appServicePlanName>functionserviceplan</appServicePlanName>
                     <region>eastus</region>
-                    <!-- refers https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details#supported-pricing-tiers for all valid values -->
-                    <pricingTier>B1</pricingTier>
+                  <!-- refers https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details#supported-pricing-tiers for all valid values -->
+                  <pricingTier>B1</pricingTier>
 
-                    <!-- Whether to disable application insightrs, default is false -->
-                    <!-- refers https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details for all valid configurations for application insights-->
-                    <disableAppInsights>true</disableAppInsights>
+                  <!-- Whether to disable application insightrs, default is false -->
+                  <!-- refers https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details for all valid configurations for application insights-->
+                  <disableAppInsights>true</disableAppInsights>
                     <runtime>
                         <!-- runtime os, could be windows, linux or docker-->
-                        <os>windows</os>
+                      <os>windows</os>
                         <javaVersion>11</javaVersion>
                     </runtime>
                     <appSettings>
